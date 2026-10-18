@@ -1,0 +1,91 @@
+--- a/external/synth_dexed_msfa/dexed.cpp
++++ b/external/synth_dexed_msfa/dexed.cpp
+@@ -166,15 +166,12 @@
+   sustain = false;
+   sostenuto = false;
+   hold = false;
+-  voices = NULL;
+-
+-  max_notes=maxnotes;
++  max_notes = (maxnotes > DEXED_MAX_NOTES) ? DEXED_MAX_NOTES : maxnotes;
+   if (max_notes > 0)
+   {
+-    voices = new ProcessorVoice[max_notes]; // sizeof(ProcessorVoice) = 20
+     for (uint8_t i = 0; i < max_notes; i++)
+     {
+-      voices[i].dx7_note = new Dx7Note; // sizeof(Dx7Note) = 692
++      voices[i].dx7_note = &notes[i];
+       voices[i].keydown = false;
+       voices[i].sustained = false;
+       voices[i].sostenuted = false;
+@@ -183,8 +180,6 @@
+       voices[i].key_pressed_timer = 0;
+     }
+   }
+-  else
+-    voices = NULL;
+ 
+   used_notes=max_notes;
+   setMonoMode(false);
+@@ -198,10 +193,10 @@
+   setVelocityScale(MIDI_VELOCITY_SCALING_OFF);
+   setNoteRefreshMode(false);
+ 
+-  engineMsfa = new EngineMsfa;
+-  engineMkI = new EngineMkI;
+-  engineOpl = new EngineOpl;
+-  setEngineType(MKI);
++  engineMsfa = &engineMsfaInstance;
++  engineMkI = NULL;
++  engineOpl = NULL;
++  setEngineType(MSFA);
+ 
+ #ifdef USE_COMPRESSOR
+   initCompressor(10.0, 3.0, 5.0, 200.0, MAX_MAKEUP_GAIN);
+@@ -214,11 +209,8 @@
+ 
+ Dexed::~Dexed()
+ {
++  panic();
+   currentNote = -1;
+-
+-  for (uint8_t note = 0; note < max_notes; note++)
+-    delete voices[note].dx7_note;
+-  delete[] voices;
+ }
+ 
+ void Dexed::setEngineType(uint8_t engine)
+--- a/external/synth_dexed_msfa/dexed.h
++++ b/external/synth_dexed_msfa/dexed.h
+@@ -40,10 +40,11 @@
+ #include "dx7note.h"
+ #include "lfo.h"
+ #include "EngineMsfa.h"
+-#include "EngineMkI.h"
+-#include "EngineOpl.h"
++class EngineMkI;
++class EngineOpl;
+ 
+ #define NUM_VOICE_PARAMETERS 156
++#define DEXED_MAX_NOTES 16
+ 
+ #ifdef USE_FILTER
+ #define FILTER_POLES 4
+@@ -367,7 +368,7 @@
+     bool midiDataHandler(uint8_t midiChannel, uint8_t midiState, uint8_t midiData1, uint8_t midiData2);
+     bool midiDataHandler(uint8_t midiChannel, uint8_t* midiData, int16_t len);
+ 
+-    ProcessorVoice* voices;
++    ProcessorVoice voices[DEXED_MAX_NOTES];
+ 
+   protected:
+     uint8_t init_voice[NUM_VOICE_PARAMETERS] = {
+@@ -401,6 +402,8 @@
+     uint8_t engineType;
+     VoiceStatus voiceStatus;
+     Lfo lfo;
++    EngineMsfa engineMsfaInstance;
++    Dx7Note notes[DEXED_MAX_NOTES];
+     EngineMsfa* engineMsfa;
+     EngineMkI* engineMkI;
+     EngineOpl* engineOpl;

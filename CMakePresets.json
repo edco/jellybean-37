@@ -1,0 +1,60 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default (All Platforms Superbuild)",
+      "description": "Build both MCU firmware and Native SDL2 Simulator",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "TARGET_PLATFORM": "ALL"
+      }
+    },
+    {
+      "name": "mcu",
+      "displayName": "JieLi PI32v2 MCU Target",
+      "description": "Cross-compile firmware for JieLi AC791N (WL82) using pi32v2 toolchain",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/mcu",
+      "toolchainFile": "${sourceDir}/cmake/toolchain-pi32v2.cmake",
+      "cacheVariables": {
+        "TARGET_PLATFORM": "MCU",
+        "CMAKE_BUILD_TYPE": "MinSizeRel"
+      }
+    },
+    {
+      "name": "native",
+      "displayName": "Host x86_64 Native SDL2 Simulator",
+      "description": "Compile native hardware simulation harness using host compiler and SDL2",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/native",
+      "cacheVariables": {
+        "TARGET_PLATFORM": "NATIVE",
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "displayName": "Build All Targets (MCU + Native)",
+      "configurePreset": "default"
+    },
+    {
+      "name": "mcu",
+      "displayName": "Build MCU Target",
+      "configurePreset": "mcu"
+    },
+    {
+      "name": "native",
+      "displayName": "Build Native Simulator",
+      "configurePreset": "native"
+    }
+  ]
+}

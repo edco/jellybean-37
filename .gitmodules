@@ -1,0 +1,7 @@
+[submodule "external/mcuno-32"]
+	path = external/mcuno-32
+	url = https://github.com/edco/mcuno-32.git
+[submodule "external/lvgl"]
+	path = external/lvgl
+	url = https://github.com/lvgl/lvgl.git
+	branch = release/v8.4

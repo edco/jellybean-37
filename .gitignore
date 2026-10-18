@@ -1,0 +1,26 @@
+# Build directories and outputs
+build/
+build-*/
+build-bench/
+bench-results/
+bin/
+temp/
+
+# Toolchain & post-build tools (downloaded locally via tools/setup_toolchain.sh)
+toolchain/
+.toolchain/
+
+# Editor & Tooling
+.vscode/
+.idea/
+.clangd/
+.cache/
+compile_commands.json
+*.swp
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/

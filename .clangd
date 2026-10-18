@@ -1,0 +1,23 @@
+# LLVM clangd configuration for jellybean-37 dual-target firmware project
+
+CompileFlags:
+  # Strip JieLi PI32v2 proprietary compiler flags unknown to upstream Clang
+  Remove:
+    - "-target"
+    - "pi32v2"
+    - "-mcpu=r3"
+    - "-mfprev1"
+    - "-mllvm"
+    - "-pi32v2-large-program=true"
+    - "-Oz"
+  Add:
+    - "-Wno-implicit-function-declaration"
+
+---
+# MCU target files (src/mcu/*) target a 32-bit architecture and rely on vendor SDK typedefs
+If:
+  PathMatch: .*/src/mcu/.*
+CompileFlags:
+  Add:
+    - "-m32"
+    - "-Wno-typedef-redefinition"
