@@ -268,6 +268,7 @@ set(SHARED_APP_SOURCES
     src/app/synth_engine.cpp
     src/app/startup_anim.c
     src/app/ui_sample.c
+    src/app/ui_patch_edit.c
     src/app/app_main.c
     external/mcuno-32/src/chorus_mn3009.c
     external/mcuno-32/src/ir3109_vcf.c

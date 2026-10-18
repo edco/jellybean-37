@@ -90,6 +90,13 @@ void hal_synth_set_octave(int8_t octave);
 void hal_synth_set_bank_patch(uint8_t bank, uint8_t patch);
 
 /**
+ * Set custom engine parameter (e.g. for MCUno-32 patch editing).
+ * @param param_id Parameter ID (JUNO_PARAM_*)
+ * @param value Parameter value
+ */
+void hal_synth_set_param(uint8_t param_id, float value);
+
+/**
  * Core 0 ISR-safe entry point for external MIDI ingress.
  * @param type SpscEventType
  * @param channel MIDI channel (0..15)

@@ -7,7 +7,7 @@ Open dual-target firmware and hardware simulator for the **M-VAVE SMK-37 Pro** k
 ## User Features
 
 - **Dual Sound Engines**:
-  - **Roland Juno-60 ([`external/mcuno-32`](external/mcuno-32))**: 6-voice polyphonic virtual analog synth with authentic PolyBLEP oscillators, IR3109 4-pole OTA filter, non-linear resonance, master HPF, and stereo MN3009 BBD chorus emulation.
+  - **Roland Juno-60 ([`external/mcuno-32`](external/mcuno-32))**: 6-voice polyphonic virtual analog synth with authentic PolyBLEP oscillators, IR3109 4-pole OTA filter, non-linear resonance, master HPF, and stereo MN3009 BBD chorus emulation. Press `PARA` to edit the parameters in real time - no saving at this stage, sorry!
   - **Yamaha DX7 ([`external/synth_dexed_msfa`](external/synth_dexed_msfa))**: 16-voice polyphonic 6-operator FM synthesis engine using the Google MSFA core with full factory DX7 patch bank support.
   - K1 controls volume, K2 chooses engine, K3 selects patch bank, K4 selects patch.
 - **Performance improvements**

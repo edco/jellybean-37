@@ -73,6 +73,11 @@ void hal_synth_set_bank_patch(uint8_t bank, uint8_t patch)
     synth_set_bank_patch(bank, patch);
 }
 
+void hal_synth_set_param(uint8_t param_id, float value)
+{
+    synth_set_custom_param(param_id, value);
+}
+
 uint8_t hal_synth_get_vu_level(void)
 {
     return synth_get_vu_level();

@@ -20,6 +20,7 @@
 #include "hal_diag.h"
 #include "hal_led.h"
 #include "ui_sample.h"
+#include "ui_patch_edit.h"
 #include "startup_anim.h"
 #include "patch_banks.h"
 #include "synth_engine.h"
@@ -131,6 +132,11 @@ static void on_pad_pressure_event(uint8_t pad_index, uint8_t pressure)
 
 static void on_encoder_event(uint8_t enc_index, int8_t delta)
 {
+    if (ui_patch_edit_is_active()) {
+        ui_patch_edit_on_encoder(enc_index, delta);
+        return;
+    }
+
     switch (enc_index) {
     case 0: /* K1: Master Volume */
     {
@@ -263,15 +269,32 @@ static void on_button_event(SmkButton button, bool pressed)
             if (current_octave < 3) current_octave++;
             sync_shared_params();
             ui_sample_set_octave(current_octave);
+            ui_patch_edit_set_octave(current_octave);
         } else if (button == SMK_BTN_OCTAVE_DOWN) {
             if (current_octave > -3) current_octave--;
             sync_shared_params();
             ui_sample_set_octave(current_octave);
+            ui_patch_edit_set_octave(current_octave);
+        } else if (button == SMK_BTN_PARA) {
+            if (current_engine == SYNTH_ENGINE_MCUNO60) {
+                ui_patch_edit_toggle();
+            }
+        } else if (ui_patch_edit_is_active()) {
+            if (button == SMK_BTN_NAV_LEFT) {
+                ui_patch_edit_nav_page(-1);
+            } else if (button == SMK_BTN_NAV_RIGHT) {
+                ui_patch_edit_nav_page(1);
+            }
         }
     }
 
     if (button < SMK_LED_BTN_COUNT) {
-        hal_led_set_button((SmkBtnLed)button, pressed);
+        if (button == SMK_BTN_PARA) {
+            /* Keep Para button lamp illuminated while parameter editing screen is active */
+            hal_led_set_button(SMK_LED_BTN_PARA, ui_patch_edit_is_active());
+        } else {
+            hal_led_set_button((SmkBtnLed)button, pressed);
+        }
     }
 
     ui_sample_set_button(button, pressed);
@@ -327,9 +350,14 @@ void app_init(void)
     hal_synth_set_engine(current_engine);
     hal_synth_set_bank_patch(current_bank, current_patch);
 
-    /* 4. Build LVGL sample screen */
+    /* 4. Build LVGL sample screen & patch edit screen */
     hal_diag_set_square(2, 15, DIAG_COLOR_CYAN);   /* Row 2 Col 15: ui_sample_init entered */
     ui_sample_init();
+    ui_patch_edit_init();
+    if (current_engine == SYNTH_ENGINE_MCUNO60) {
+        ui_patch_edit_load_patch(current_bank, current_patch);
+    }
+    ui_patch_edit_set_octave(current_octave);
     hal_diag_set_square(2, 15, DIAG_COLOR_GREEN);  /* Row 2 Col 15: ui_sample_init returned */
     ui_sample_set_engine_bank_patch(current_engine, current_bank, current_patch,
                                      patch_banks_get_engine_name(current_engine),
@@ -363,6 +391,9 @@ void app_step(void)
         patch_pending = false;
         hal_synth_set_engine(current_engine);
         hal_synth_set_bank_patch(current_bank, current_patch);
+        if (current_engine == SYNTH_ENGINE_MCUNO60) {
+            ui_patch_edit_load_patch(current_bank, current_patch);
+        }
         ui_sample_set_engine_bank_patch(current_engine, current_bank, current_patch,
                                          patch_banks_get_engine_name(current_engine),
                                          patch_banks_get_bank_name_for_engine(current_engine, current_bank),
@@ -377,6 +408,7 @@ void app_step(void)
     }
 
     ui_sample_update();
+    ui_patch_edit_update();
 
     /* Flush staged pad RGB updates to physical WS2812B LEDs */
     hal_led_update_pads();

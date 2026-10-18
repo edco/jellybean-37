@@ -116,6 +116,13 @@ void synth_set_bank_patch(uint8_t bank, uint8_t patch)
     }
 }
 
+void synth_set_custom_param(uint16_t param_id, float value)
+{
+    if (current_engine != nullptr) {
+        current_engine->set_custom_param(param_id, value);
+    }
+}
+
 void synth_note_on(uint8_t note, uint8_t velocity)
 {
     if (current_engine != nullptr) {

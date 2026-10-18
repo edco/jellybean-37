@@ -426,6 +426,23 @@ void cpu1_entry(void)
                     synth_set_volume_f(current_volume);
                     synth_set_aftertouch_f(current_aftertouch);
                     break;
+                case SPSC_EVT_PARAM_CHANGE: {
+                    float val = 0.0f;
+                    uint8_t pid = evt.channel;
+                    if (pid == 0 || pid == 32) {
+                        val = (float)evt.uvalue16 / 100.0f;
+                    } else if (pid == 1) {
+                        val = (float)evt.uvalue16 / 1000.0f;
+                    } else if (pid == 15) {
+                        val = (float)evt.svalue16;
+                    } else if (pid == 4 || pid == 11 || pid == 18 || pid == 24 || pid == 31 || pid == 33 || pid == 34) {
+                        val = (float)evt.uvalue16;
+                    } else {
+                        val = (float)evt.uvalue16 / 10000.0f;
+                    }
+                    synth_set_custom_param(pid, val);
+                    break;
+                }
                 default:
                     break;
                 }
