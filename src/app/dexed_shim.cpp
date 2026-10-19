@@ -97,7 +97,8 @@ void DexedShim::set_aftertouch(float value)
 
 void DexedShim::set_master_volume(float volume)
 {
-    setGain(volume);
+    (void)volume;
+    setGain(1.0f);
 }
 
 bool DexedShim::load_patch(uint8_t bank, uint8_t patch)
@@ -117,7 +118,7 @@ void DexedShim::set_custom_param(uint16_t param_id, float value)
     (void)value;
 }
 
-void DexedShim::render_block(int16_t *stereo_out, size_t frames)
+void DexedShim::render_block(float *stereo_out, size_t frames)
 {
     if (stereo_out == nullptr || frames == 0) {
         return;
@@ -170,11 +171,10 @@ void DexedShim::render_block(int16_t *stereo_out, size_t frames)
         for (size_t i = 0; i < chunk; i++) {
             int32_t q16_val = q32_buffer[i] >> 16;
             int32_t sample = ((q16_val * (int32_t)gain) >> 11) * 6;
-            if (sample > 32767) sample = 32767;
-            else if (sample < -32768) sample = -32768;
+            float s = (float)sample / 32767.0f;
 
-            stereo_out[out_idx * 2 + 0] = (int16_t)sample;
-            stereo_out[out_idx * 2 + 1] = (int16_t)sample;
+            stereo_out[out_idx * 2 + 0] = s;
+            stereo_out[out_idx * 2 + 1] = s;
             out_idx++;
         }
 

@@ -60,7 +60,6 @@
 /* Static cache-line aligned double-buffered DMA ring */
 static int32_t audio_dma_buf[AUDIO_DMA_TOTAL_WORDS] __attribute__((aligned(32)));
 static HalAudioCallback audio_cb = NULL;
-static uint8_t volume_percent = 30; /* default 30% comfortable listening level */
 static volatile uint32_t audio_block_count = 1;
 
 /* Core 1 Real-time Audio Render Synchronization Flags */
@@ -97,31 +96,18 @@ void mcu_audio_render_quantum(int32_t *dma_dst, const int16_t *pcm16, size_t fra
 {
     if (!dma_dst || frames == 0) return;
 
-    /* Natural audio-taper perceptual curve:
-     * gain = vol * (vol + 50) / 15000 (vol in 0..100).
-     * Peak 16-bit input: 32767. num max = 15000.
-     * (val * num) / 15000 maintains clean 16-bit range [-32768, 32767].
-     * Then shift left by 8 bits (<< 8) for standard 24-bit I2S transmission
-     * to the CS4344 DAC in 32-bit slot mode. */
-    uint32_t num = (volume_percent == 0) ? 0 :
-        (uint32_t)volume_percent * ((uint32_t)volume_percent + 50);
-
-    if (!pcm16 || num == 0) {
+    if (!pcm16) {
         for (size_t i = 0; i < frames * 2; i++) {
             dma_dst[i] = 0;
         }
         return;
     }
 
-    for (size_t i = 0; i < frames; i++) {
-        int32_t l = (int32_t)pcm16[i * 2 + 0];
-        int32_t r = (int32_t)pcm16[i * 2 + 1];
-
-        l = (int32_t)(((int64_t)l * (int64_t)num) / 15000) << 8;
-        r = (int32_t)(((int64_t)r * (int64_t)num) / 15000) << 8;
-
-        dma_dst[i * 2 + 0] = l;
-        dma_dst[i * 2 + 1] = r;
+    /* Shift left by 8 bits (<< 8) for standard 24-bit I2S transmission
+     * to the CS4344 DAC in 32-bit slot mode. Master volume scaling has
+     * already been applied strictly before the soft limiter in synth_engine. */
+    for (size_t i = 0; i < frames * 2; i++) {
+        dma_dst[i] = (int32_t)pcm16[i] << 8;
     }
 }
 
@@ -262,8 +248,7 @@ void hal_audio_stop(void)
 
 void hal_audio_set_volume(uint8_t volume)
 {
-    if (volume > 100) volume = 100;
-    volume_percent = volume;
+    (void)volume;
 }
 
 uint32_t hal_audio_get_block_count(void)

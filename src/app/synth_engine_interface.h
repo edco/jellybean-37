@@ -43,7 +43,7 @@ public:
     virtual bool load_patch(uint8_t bank, uint8_t patch) = 0;
     virtual void set_custom_param(uint16_t param_id, float value) = 0;
 
-    virtual void render_block(int16_t *stereo_out, size_t frames) = 0;
+    virtual void render_block(float *stereo_out, size_t frames) = 0;
     virtual const EngineMetadata* get_metadata() const = 0;
 };
 

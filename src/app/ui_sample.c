@@ -334,6 +334,33 @@ void ui_sample_show_volume(uint8_t volume)
     }
 }
 
+void ui_sample_show_limiter(float t, float m, bool is_thresh)
+{
+    if (lbl_extra) {
+        char buf[36];
+        if (is_thresh) {
+            if (t >= 1.00f) {
+                snprintf(buf, sizeof(buf), "Limiter T: 1.00 (Off)");
+            } else {
+                snprintf(buf, sizeof(buf), "Limiter T: %.2f", t);
+            }
+        } else {
+            if (m <= 1.0f) {
+                snprintf(buf, sizeof(buf), "Limiter M: 1.0 (Off)");
+            } else {
+                snprintf(buf, sizeof(buf), "Limiter M: %.1f", m);
+            }
+        }
+        lv_label_set_text(lbl_extra, buf);
+        lv_obj_set_style_text_color(lbl_extra, lv_color_hex(0x00E676), 0);
+    }
+    if (lbl_status) {
+        char buf[40];
+        snprintf(buf, sizeof(buf), "Limiter: T=%.2f M=%.1f", t, m);
+        lv_label_set_text(lbl_status, buf);
+    }
+}
+
 void ui_sample_clear_volume_overlay(void)
 {
     if (lbl_extra) {

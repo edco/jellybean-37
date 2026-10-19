@@ -44,6 +44,7 @@ typedef struct {
 } UiControlDef;
 
 /* Option string arrays for switches */
+static const char *const POLY_MODE_OPTIONS[] = {"Poly 1", "Poly 2", "Unison"};
 static const char *const ARP_DIR_OPTIONS[] = {"Up", "Up/Down", "Down"};
 static const char *const ARP_RNG_OPTIONS[] = {"1 Oct", "2 Oct", "3 Oct"};
 static const char *const LFO_MODE_OPTIONS[] = {"Triangle", "Square"};
@@ -54,16 +55,16 @@ static const char *const VCA_MODE_OPTIONS[] = {"Envelope", "Gate"};
 
 /* Definitions of the 4 pages */
 static const UiControlDef PAGE_CONTROLS[UI_PATCH_EDIT_NUM_PAGES][NUM_COLS] = {
-    /* Page 1: Arpeggio (K1..K4) & LFO (K5..K7) */
+    /* Page 1: Voice (K1), Arpeggio (K2..K5) & LFO (K6..K8) */
     {
+        {CTRL_TYPE_SWITCH, "Voice",    "mod", JUNO_PARAM_POLY_MODE, 3, POLY_MODE_OPTIONS},
         {CTRL_TYPE_BUTTON, "Arpeggio", "en",  JUNO_PARAM_ARP_ON, 0, NULL},
         {CTRL_TYPE_SWITCH, "Arpeggio", "dir", JUNO_PARAM_ARP_MODE, 3, ARP_DIR_OPTIONS},
         {CTRL_TYPE_SWITCH, "Arpeggio", "rng", JUNO_PARAM_ARP_RANGE, 3, ARP_RNG_OPTIONS},
         {CTRL_TYPE_FADER,  "Arpeggio", "rat", JUNO_PARAM_ARP_RATE, 0, NULL},
         {CTRL_TYPE_FADER,  "LFO",      "rat", JUNO_PARAM_LFO_RATE, 0, NULL},
         {CTRL_TYPE_FADER,  "LFO",      "dly", JUNO_PARAM_LFO_DELAY, 0, NULL},
-        {CTRL_TYPE_SWITCH, "LFO",      "mod", 0xFF, 2, LFO_MODE_OPTIONS},
-        {CTRL_TYPE_NONE,   NULL,       "",    0, 0, NULL}
+        {CTRL_TYPE_SWITCH, "LFO",      "mod", 0xFF, 2, LFO_MODE_OPTIONS}
     },
     /* Page 2: DCO (K1..K3) & Waves (K4..K8) */
     {
@@ -419,19 +420,20 @@ static float get_param_value(uint8_t page, uint8_t col)
     switch (page) {
     case 0:
         switch (col) {
-        case 0: return edit_params.arp_on ? 1.0f : 0.0f;
-        case 1:
+        case 0: return (float)edit_params.poly_mode;
+        case 1: return edit_params.arp_on ? 1.0f : 0.0f;
+        case 2:
             if (edit_params.arp_mode == JUNO_ARP_UP) return 0.0f;
             if (edit_params.arp_mode == JUNO_ARP_UP_DOWN) return 1.0f;
             return 2.0f;
-        case 2: return (float)(edit_params.arp_range - 1);
-        case 3:
-            return (edit_params.arp_rate - 1.55f) / (48.6f - 1.55f);
+        case 3: return (float)(edit_params.arp_range - 1);
         case 4:
-            return (edit_params.lfo_rate - 0.1f) / 21.0f;
+            return (edit_params.arp_rate - 1.55f) / (48.6f - 1.55f);
         case 5:
+            return (edit_params.lfo_rate - 0.1f) / 21.0f;
+        case 6:
             return edit_params.lfo_delay / 1.5f;
-        case 6: return (float)lfo_mode_custom;
+        case 7: return (float)lfo_mode_custom;
         default: break;
         }
         break;
@@ -490,12 +492,21 @@ static void apply_param_delta(uint8_t page, uint8_t col, int8_t delta)
     switch (page) {
     case 0:
         switch (col) {
-        case 0:
+        case 0: {
+            int mode = (int)edit_params.poly_mode + delta;
+            if (mode < 0) mode = 0;
+            if (mode > 2) mode = 2;
+            edit_params.poly_mode = mode;
+            hal_synth_set_param(JUNO_PARAM_POLY_MODE, (float)edit_params.poly_mode);
+            snprintf(msg, sizeof(msg), "Voice Mode: %s", POLY_MODE_OPTIONS[mode]);
+            break;
+        }
+        case 1:
             edit_params.arp_on = !edit_params.arp_on;
             hal_synth_set_param(JUNO_PARAM_ARP_ON, edit_params.arp_on ? 1.0f : 0.0f);
             snprintf(msg, sizeof(msg), "Arpeggio: %s", edit_params.arp_on ? "ON" : "OFF");
             break;
-        case 1: {
+        case 2: {
             int mode = (edit_params.arp_mode == JUNO_ARP_UP) ? 0 : ((edit_params.arp_mode == JUNO_ARP_UP_DOWN) ? 1 : 2);
             mode = (mode + delta) % 3;
             if (mode < 0) mode += 3;
@@ -506,7 +517,7 @@ static void apply_param_delta(uint8_t page, uint8_t col, int8_t delta)
             snprintf(msg, sizeof(msg), "Arp Dir: %s", ARP_DIR_OPTIONS[mode]);
             break;
         }
-        case 2: {
+        case 3: {
             int rng = edit_params.arp_range + delta;
             if (rng < 1) rng = 1;
             if (rng > 3) rng = 3;
@@ -515,7 +526,7 @@ static void apply_param_delta(uint8_t page, uint8_t col, int8_t delta)
             snprintf(msg, sizeof(msg), "Arp Range: %d Oct", edit_params.arp_range);
             break;
         }
-        case 3: {
+        case 4: {
             float norm = (edit_params.arp_rate - 1.55f) / (48.6f - 1.55f);
             norm += (float)delta * 0.02f;
             if (norm < 0.0f) norm = 0.0f;
@@ -526,7 +537,7 @@ static void apply_param_delta(uint8_t page, uint8_t col, int8_t delta)
             snprintf(msg, sizeof(msg), "Arp Rate: %u bpm", bpm);
             break;
         }
-        case 4: {
+        case 5: {
             float norm = (edit_params.lfo_rate - 0.1f) / 21.0f;
             norm += (float)delta * 0.02f;
             if (norm < 0.0f) norm = 0.0f;
@@ -536,7 +547,7 @@ static void apply_param_delta(uint8_t page, uint8_t col, int8_t delta)
             snprintf(msg, sizeof(msg), "LFO Rate: %.1f Hz", edit_params.lfo_rate);
             break;
         }
-        case 5: {
+        case 6: {
             float norm = edit_params.lfo_delay / 1.5f;
             norm += (float)delta * 0.02f;
             if (norm < 0.0f) norm = 0.0f;
@@ -546,7 +557,7 @@ static void apply_param_delta(uint8_t page, uint8_t col, int8_t delta)
             snprintf(msg, sizeof(msg), "LFO Delay: %u ms", (uint32_t)(norm * 1500.0f));
             break;
         }
-        case 6: {
+        case 7: {
             lfo_mode_custom = (lfo_mode_custom + (delta > 0 ? 1 : 1)) % 2;
             snprintf(msg, sizeof(msg), "LFO Mode: %s", LFO_MODE_OPTIONS[lfo_mode_custom]);
             break;

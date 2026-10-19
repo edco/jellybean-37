@@ -73,8 +73,9 @@ void JunoShim::set_aftertouch(float value)
 
 void JunoShim::set_master_volume(float volume)
 {
-    master_volume = volume;
-    juno_engine_set_param(&engine, JUNO_PARAM_MASTER_VOL, master_volume);
+    (void)volume;
+    master_volume = 1.0f;
+    juno_engine_set_param(&engine, JUNO_PARAM_MASTER_VOL, 1.0f);
 }
 
 bool JunoShim::load_patch(uint8_t bank, uint8_t patch)
@@ -83,7 +84,7 @@ bool JunoShim::load_patch(uint8_t bank, uint8_t patch)
         const JunoEngineParams *p = mcuno60_get_patch_params(bank, patch);
         if (p != nullptr) {
             engine.params = *p;
-            engine.params.master_volume = master_volume;
+            engine.params.master_volume = 1.0f;
             engine.params.mod_wheel = mod_wheel_val;
             engine.params.bender = bender_val;
             hpf_compute_coefficients(&engine.master_hpf, engine.params.hpf_position);
@@ -99,7 +100,7 @@ void JunoShim::set_custom_param(uint16_t param_id, float value)
     juno_engine_set_param(&engine, (int32_t)param_id, value);
 }
 
-void JunoShim::render_block(int16_t *stereo_out, size_t frames)
+void JunoShim::render_block(float *stereo_out, size_t frames)
 {
     if (stereo_out == nullptr || frames == 0) {
         return;
@@ -115,17 +116,8 @@ void JunoShim::render_block(int16_t *stereo_out, size_t frames)
         juno_engine_process_block(&engine, out_l, out_r, (int32_t)chunk);
 
         for (size_t i = 0; i < chunk; i++) {
-            int32_t sample_l = (int32_t)(out_l[i] * 32767.0f);
-            int32_t sample_r = (int32_t)(out_r[i] * 32767.0f);
-
-            if (sample_l > 32767) sample_l = 32767;
-            else if (sample_l < -32768) sample_l = -32768;
-
-            if (sample_r > 32767) sample_r = 32767;
-            else if (sample_r < -32768) sample_r = -32768;
-
-            stereo_out[out_idx * 2 + 0] = (int16_t)sample_l;
-            stereo_out[out_idx * 2 + 1] = (int16_t)sample_r;
+            stereo_out[out_idx * 2 + 0] = out_l[i];
+            stereo_out[out_idx * 2 + 1] = out_r[i];
             out_idx++;
         }
 

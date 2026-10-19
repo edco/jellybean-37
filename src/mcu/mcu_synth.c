@@ -116,13 +116,28 @@ void hal_synth_set_param(uint8_t param_id, float value)
         evt.uvalue16 = (uint16_t)(value * 1000.0f + 0.5f);
     } else if (param_id == 15) {
         evt.svalue16 = (value < 0.0f) ? -1 : 1;
-    } else if (param_id == 4 || param_id == 11 || param_id == 18 || param_id == 24 || param_id == 31 || param_id == 33 || param_id == 34) {
+    } else if (param_id == 4 || param_id == 11 || param_id == 18 || param_id == 24 || param_id == 29 || param_id == 31 || param_id == 33 || param_id == 34) {
         evt.uvalue16 = (uint16_t)value;
     } else {
         if (value < 0.0f) value = 0.0f;
         if (value > 1.0f) value = 1.0f;
         evt.uvalue16 = (uint16_t)(value * 10000.0f + 0.5f);
     }
+    send_event(&evt);
+}
+
+void hal_synth_set_limiter(float threshold, float max_ceiling)
+{
+    SpscEvent evt;
+    evt.raw = 0;
+    evt.type = SPSC_EVT_LIMITER;
+    evt.channel = 0;
+    if (threshold < 0.0f) threshold = 0.0f;
+    if (threshold > 1.0f) threshold = 1.0f;
+    if (max_ceiling < 1.0f) max_ceiling = 1.0f;
+    if (max_ceiling > 8.0f) max_ceiling = 8.0f;
+    evt.data1 = (uint8_t)(threshold * 100.0f + 0.5f);
+    evt.data2 = (uint8_t)(max_ceiling * 10.0f + 0.5f);
     send_event(&evt);
 }
 

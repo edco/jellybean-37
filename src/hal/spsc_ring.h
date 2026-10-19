@@ -51,7 +51,8 @@ typedef enum {
     SPSC_EVT_PROGRAM_CHANGE,
     SPSC_EVT_AFTERTOUCH,
     SPSC_EVT_ENGINE_SELECT,
-    SPSC_EVT_PARAM_CHANGE
+    SPSC_EVT_PARAM_CHANGE,
+    SPSC_EVT_LIMITER
 } SpscEventType;
 
 /* Backwards compatibility aliases */

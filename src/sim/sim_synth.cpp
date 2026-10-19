@@ -78,6 +78,11 @@ void hal_synth_set_param(uint8_t param_id, float value)
     synth_set_custom_param(param_id, value);
 }
 
+void hal_synth_set_limiter(float threshold, float max_ceiling)
+{
+    synth_set_limiter(threshold, max_ceiling);
+}
+
 uint8_t hal_synth_get_vu_level(void)
 {
     return synth_get_vu_level();

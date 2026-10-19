@@ -368,8 +368,8 @@ void cpu1_entry(void)
     float target_bender = 0.0f;
     float current_mod_wheel = 0.0f;
     float target_mod_wheel = 0.0f;
-    float current_volume = 0.8f;
-    float target_volume = 0.8f;
+    float current_volume = 1.0f;
+    float target_volume = 1.0f;
     float current_aftertouch = 0.0f;
     float target_aftertouch = 0.0f;
 #endif
@@ -406,7 +406,7 @@ void cpu1_entry(void)
                     if (evt.data1 == 1) {
                         target_mod_wheel = (float)evt.data2 / 127.0f;
                     } else if (evt.data1 == 7) {
-                        target_volume = (float)evt.data2 / 127.0f;
+                        target_volume = (float)evt.data2 / 100.0f;
                     }
                     break;
                 case SPSC_EVT_AFTERTOUCH:
@@ -435,12 +435,18 @@ void cpu1_entry(void)
                         val = (float)evt.uvalue16 / 1000.0f;
                     } else if (pid == 15) {
                         val = (float)evt.svalue16;
-                    } else if (pid == 4 || pid == 11 || pid == 18 || pid == 24 || pid == 31 || pid == 33 || pid == 34) {
+                    } else if (pid == 4 || pid == 11 || pid == 18 || pid == 24 || pid == 29 || pid == 31 || pid == 33 || pid == 34) {
                         val = (float)evt.uvalue16;
                     } else {
                         val = (float)evt.uvalue16 / 10000.0f;
                     }
                     synth_set_custom_param(pid, val);
+                    break;
+                }
+                case SPSC_EVT_LIMITER: {
+                    float t = (float)evt.data1 / 100.0f;
+                    float m = (float)evt.data2 / 10.0f;
+                    synth_set_limiter(t, m);
                     break;
                 }
                 default:

@@ -53,6 +53,7 @@ void ui_sample_set_octave(int8_t octave);
 void ui_sample_set_engine_bank_patch(uint8_t engine, uint8_t bank, uint8_t patch, const char *engine_name, const char *bank_name, const char *patch_name, bool pending);
 void ui_sample_set_bank_patch(uint8_t bank, uint8_t patch, const char *bank_name, const char *patch_name, bool pending);
 void ui_sample_show_volume(uint8_t volume);
+void ui_sample_show_limiter(float t, float m, bool is_thresh);
 void ui_sample_clear_volume_overlay(void);
 
 #ifdef __cplusplus

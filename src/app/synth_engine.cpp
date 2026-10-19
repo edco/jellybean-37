@@ -16,16 +16,19 @@
 #include "dexed_shim.h"
 #include "juno_shim.h"
 #include "patch_banks.h"
+#include "soft_limiter.h"
 #include <new>
 #include <string.h>
 
 constexpr size_t MAX_ENGINE_SIZE = sizeof(DexedShim) > sizeof(JunoShim) ? sizeof(DexedShim) : sizeof(JunoShim);
 alignas(32) static uint8_t engine_arena[MAX_ENGINE_SIZE];
 
+static SoftLimiterPade s_limiter;
+
 static SynthEngine *current_engine = nullptr;
 static uint8_t current_engine_idx = SYNTH_ENGINE_DEXED;
 static uint32_t engine_sample_rate = 48000;
-static float master_volume = 0.8f;
+static float master_volume = 1.0f;
 static float mod_wheel_val = 0.0f;
 static float bender_val = 0.0f;
 static float aftertouch_val = 0.0f;
@@ -56,6 +59,7 @@ void synth_init(uint32_t sample_rate)
     current_engine->load_patch(current_bank, current_patch);
 
     peak_vu = 0;
+    soft_limiter_init(&s_limiter, SOFT_LIMITER_DEFAULT_THRESHOLD, SOFT_LIMITER_DEFAULT_MAX);
     init_done = 1;
 }
 
@@ -185,6 +189,7 @@ void synth_set_aftertouch(uint8_t val)
 
 void synth_set_volume_f(float volume)
 {
+    if (volume < 0.0f) volume = 0.0f;
     master_volume = volume;
     if (current_engine != nullptr) {
         current_engine->set_master_volume(master_volume);
@@ -193,12 +198,23 @@ void synth_set_volume_f(float volume)
 
 void synth_set_volume(uint8_t volume)
 {
-    synth_set_volume_f((float)volume / 127.0f);
+    synth_set_volume_f((float)volume / 100.0f);
 }
 
 uint8_t synth_get_vu_level(void)
 {
     return peak_vu;
+}
+
+void synth_set_limiter(float threshold, float max_ceiling)
+{
+    soft_limiter_init(&s_limiter, threshold, max_ceiling);
+}
+
+void synth_get_limiter(float *threshold, float *max_ceiling)
+{
+    if (threshold != nullptr) *threshold = s_limiter.T;
+    if (max_ceiling != nullptr) *max_ceiling = s_limiter.M;
 }
 
 void synth_get_samples(int16_t *buf, size_t frames)
@@ -212,14 +228,52 @@ void synth_get_samples(int16_t *buf, size_t frames)
         return;
     }
 
-    current_engine->render_block(buf, frames);
-
+    float fbuf[64]; /* 32 stereo frames */
+    size_t remaining = frames;
+    size_t out_idx = 0;
     int32_t peak = 0;
-    for (size_t i = 0; i < frames; i++) {
-        int32_t abs_l = (buf[i * 2 + 0] < 0) ? -buf[i * 2 + 0] : buf[i * 2 + 0];
-        int32_t abs_r = (buf[i * 2 + 1] < 0) ? -buf[i * 2 + 1] : buf[i * 2 + 1];
-        if (abs_l > peak) peak = abs_l;
-        if (abs_r > peak) peak = abs_r;
+
+    /* Natural audio-taper perceptual curve applied strictly BEFORE the soft limiter:
+     * gain = v * (v + 0.5) / 1.5 where v = master_volume (1.0 at vol 100).
+     * At vol 100 (v=1.0): gain = 1.00 (0 dB unity).
+     * At vol 127 (v=1.27): gain = 1.50 (+3.5 dB overdrive boost).
+     * At vol 50 (v=0.5): gain = 0.333 (-9.5 dB).
+     * At vol 0 (v=0.0): gain = 0.0. */
+    float v = master_volume;
+    float vol_gain = (v <= 0.0f) ? 0.0f : (v * (v + 0.5f) * (1.0f / 1.5f));
+
+    while (remaining > 0) {
+        size_t chunk = (remaining > 32) ? 32 : remaining;
+        current_engine->render_block(fbuf, chunk);
+
+        for (size_t i = 0; i < chunk; i++) {
+            float in_l = fbuf[i * 2 + 0] * vol_gain;
+            float in_r = fbuf[i * 2 + 1] * vol_gain;
+
+            float l = soft_limit_branchy(&s_limiter, in_l);
+            float r = soft_limit_branchy(&s_limiter, in_r);
+
+            int32_t samp_l = (int32_t)(l * 32767.0f);
+            int32_t samp_r = (int32_t)(r * 32767.0f);
+
+            if (samp_l > 32767) samp_l = 32767;
+            else if (samp_l < -32768) samp_l = -32768;
+
+            if (samp_r > 32767) samp_r = 32767;
+            else if (samp_r < -32768) samp_r = -32768;
+
+            buf[out_idx * 2 + 0] = (int16_t)samp_l;
+            buf[out_idx * 2 + 1] = (int16_t)samp_r;
+
+            int32_t abs_l = (samp_l < 0) ? -samp_l : samp_l;
+            int32_t abs_r = (samp_r < 0) ? -samp_r : samp_r;
+            if (abs_l > peak) peak = abs_l;
+            if (abs_r > peak) peak = abs_r;
+
+            out_idx++;
+        }
+
+        remaining -= chunk;
     }
 
     uint8_t current_vu = (uint8_t)((peak * 100) / 32767);

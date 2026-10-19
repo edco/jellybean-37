@@ -106,6 +106,13 @@ void hal_synth_set_param(uint8_t param_id, float value);
 void hal_synth_midi_event_from_isr(uint8_t type, uint8_t channel, uint8_t d1, uint8_t d2);
 
 /**
+ * Configure final soft limiter parameters.
+ * @param threshold Threshold T (0.00 to 1.00; 1.00 = disabled)
+ * @param max_ceiling Maximum M (1.0 to 8.0; 1.0 = disabled)
+ */
+void hal_synth_set_limiter(float threshold, float max_ceiling);
+
+/**
  * Retrieve peak audio level for UI VU meter.
  * @return VU level (0..100)
  */

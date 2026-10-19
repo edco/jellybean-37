@@ -24,6 +24,8 @@
 #include "startup_anim.h"
 #include "patch_banks.h"
 #include "synth_engine.h"
+#include "soft_limiter.h"
+#include <math.h>
 
 static int8_t current_octave = 0;
 static uint8_t current_volume = 100;
@@ -31,6 +33,11 @@ static uint8_t current_mod_wheel = 0;
 static uint8_t current_engine = 0;
 static uint8_t current_bank = 0;
 static uint8_t current_patch = 0;
+
+static float current_limiter_t = SOFT_LIMITER_DEFAULT_THRESHOLD;
+static float current_limiter_m = SOFT_LIMITER_DEFAULT_MAX;
+static uint32_t limiter_change_time = 0;
+static bool limiter_showing = false;
 
 /** Deferred until after the startup animation, which clears every panel lamp. */
 
@@ -213,14 +220,30 @@ static void on_encoder_event(uint8_t enc_index, int8_t delta)
                                          true);
         break;
     }
-    case 4: /* K5: Octave Shift */
+    case 4: /* K5: Limiter Threshold T (0.00 to 1.00) */
     {
-        int oct = current_octave + delta;
-        if (oct < -3) oct = -3;
-        if (oct > 3) oct = 3;
-        current_octave = (int8_t)oct;
-        sync_shared_params();
-        ui_sample_set_octave(current_octave);
+        current_limiter_t += (float)delta * 0.01f;
+        if (current_limiter_t < 0.00f) current_limiter_t = 0.00f;
+        if (current_limiter_t > 1.00f) current_limiter_t = 1.00f;
+        current_limiter_t = roundf(current_limiter_t * 100.0f) / 100.0f;
+
+        hal_synth_set_limiter(current_limiter_t, current_limiter_m);
+        limiter_change_time = hal_get_ms();
+        limiter_showing = true;
+        ui_sample_show_limiter(current_limiter_t, current_limiter_m, true);
+        break;
+    }
+    case 5: /* K6: Limiter Maximum M (1.0 to 8.0) */
+    {
+        current_limiter_m += (float)delta * 0.1f;
+        if (current_limiter_m < 1.0f) current_limiter_m = 1.0f;
+        if (current_limiter_m > 8.0f) current_limiter_m = 8.0f;
+        current_limiter_m = roundf(current_limiter_m * 10.0f) / 10.0f;
+
+        hal_synth_set_limiter(current_limiter_t, current_limiter_m);
+        limiter_change_time = hal_get_ms();
+        limiter_showing = true;
+        ui_sample_show_limiter(current_limiter_t, current_limiter_m, false);
         break;
     }
     default:
@@ -349,6 +372,7 @@ void app_init(void)
     hal_audio_set_volume((uint8_t)((current_volume * 100) / 127));
     hal_synth_set_engine(current_engine);
     hal_synth_set_bank_patch(current_bank, current_patch);
+    hal_synth_set_limiter(current_limiter_t, current_limiter_m);
 
     /* 4. Build LVGL sample screen & patch edit screen */
     hal_diag_set_square(2, 15, DIAG_COLOR_CYAN);   /* Row 2 Col 15: ui_sample_init entered */
@@ -404,6 +428,12 @@ void app_step(void)
     /* Hide volume display overlay 0.5s after last adjustment */
     if (vol_showing && (now - vol_change_time >= 500)) {
         vol_showing = false;
+        ui_sample_clear_volume_overlay();
+    }
+
+    /* Hide limiter display overlay 1.5s after last adjustment */
+    if (limiter_showing && (now - limiter_change_time >= 1500)) {
+        limiter_showing = false;
         ui_sample_clear_volume_overlay();
     }
 

@@ -37,7 +37,7 @@ public:
     bool load_patch(uint8_t bank, uint8_t patch) override;
     void set_custom_param(uint16_t param_id, float value) override;
 
-    void render_block(int16_t *stereo_out, size_t frames) override;
+    void render_block(float *stereo_out, size_t frames) override;
     const EngineMetadata* get_metadata() const override;
 };
 

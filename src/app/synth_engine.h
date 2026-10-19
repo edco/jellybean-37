@@ -44,6 +44,8 @@ void synth_set_volume(uint8_t volume);   /* 0 to 127 */
 void synth_set_volume_f(float volume);   /* 0.0f to 1.0f */
 void synth_set_bank_patch(uint8_t bank, uint8_t patch);
 void synth_set_custom_param(uint16_t param_id, float value);
+void synth_set_limiter(float threshold, float max_ceiling);
+void synth_get_limiter(float *threshold, float *max_ceiling);
 
 /**
  * Poll audio engine to fill interleaved 16-bit signed stereo samples.

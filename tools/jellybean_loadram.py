@@ -153,6 +153,36 @@ class AlsaSeqBackend(MidiTransport):
     def __init__(self, client_name: str = "jellybean_loadram", card: int | None = None):
         asound = ctypes.CDLL("libasound.so.2")
         self.asound = asound
+
+        # Setup ctypes signatures to prevent 64-bit pointer truncation
+        asound.snd_seq_open.argtypes = [ctypes.POINTER(ctypes.c_void_p), ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
+        asound.snd_seq_set_client_name.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+        asound.snd_seq_create_simple_port.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_uint, ctypes.c_uint]
+        asound.snd_seq_connect_to.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+        asound.snd_seq_close.argtypes = [ctypes.c_void_p]
+
+        asound.snd_seq_client_info_set_client.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        asound.snd_seq_query_next_client.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        asound.snd_seq_client_info_get_client.argtypes = [ctypes.c_void_p]
+        asound.snd_seq_client_info_get_client.restype = ctypes.c_int
+        asound.snd_seq_client_info_get_card.argtypes = [ctypes.c_void_p]
+        asound.snd_seq_client_info_get_card.restype = ctypes.c_int
+        asound.snd_seq_client_info_get_name.argtypes = [ctypes.c_void_p]
+        asound.snd_seq_client_info_get_name.restype = ctypes.c_char_p
+
+        asound.snd_seq_port_info_set_client.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        asound.snd_seq_port_info_set_port.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        asound.snd_seq_query_next_port.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        asound.snd_seq_port_info_get_capability.argtypes = [ctypes.c_void_p]
+        asound.snd_seq_port_info_get_capability.restype = ctypes.c_uint
+        asound.snd_seq_port_info_get_port.argtypes = [ctypes.c_void_p]
+        asound.snd_seq_port_info_get_port.restype = ctypes.c_int
+        asound.snd_seq_port_info_get_name.argtypes = [ctypes.c_void_p]
+        asound.snd_seq_port_info_get_name.restype = ctypes.c_char_p
+
+        asound.snd_seq_event_output_direct.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        asound.snd_seq_drain_output.argtypes = [ctypes.c_void_p]
+
         self.handle = ctypes.c_void_p()
         SND_SEQ_OPEN_DUPLEX = 3
         SND_SEQ_NONBLOCK = 1
@@ -169,39 +199,84 @@ class AlsaSeqBackend(MidiTransport):
             SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE,
             SND_SEQ_PORT_TYPE_APPLICATION,
         )
-        dest_client, dest_port = self._find_dest(card)
-        err = asound.snd_seq_connect_to(self.handle, self.port, dest_client, dest_port)
-        if err < 0:
-            raise RuntimeError(f"snd_seq_connect_to failed: {err}")
+        self.dest_client, self.dest_port = self._find_dest(card)
+        try:
+            asound.snd_seq_connect_to(self.handle, self.port, self.dest_client, self.dest_port)
+        except Exception:
+            pass
 
     def _find_dest(self, card: int | None) -> tuple[int, int]:
-        cinfo = ctypes.create_string_buffer(512)
-        pinfo = ctypes.create_string_buffer(512)
+        cinfo = ctypes.create_string_buffer(256)
+        pinfo = ctypes.create_string_buffer(256)
         asound = self.asound
         asound.snd_seq_client_info_set_client(cinfo, -1)
+
+        candidates = []
         while asound.snd_seq_query_next_client(self.handle, cinfo) == 0:
             c = asound.snd_seq_client_info_get_client(cinfo)
             if c < 16:
                 continue
+            c_card = asound.snd_seq_client_info_get_card(cinfo)
+            c_name_raw = asound.snd_seq_client_info_get_name(cinfo)
+            c_name = (ctypes.string_at(c_name_raw).decode("latin1", "replace") if c_name_raw else "").lower()
+
             asound.snd_seq_port_info_set_client(pinfo, c)
             asound.snd_seq_port_info_set_port(pinfo, -1)
             while asound.snd_seq_query_next_port(self.handle, pinfo) == 0:
                 caps = asound.snd_seq_port_info_get_capability(pinfo)
                 p = asound.snd_seq_port_info_get_port(pinfo)
-                if (caps & (1 << 1)):
+                p_name_raw = asound.snd_seq_port_info_get_name(pinfo)
+                p_name = (ctypes.string_at(p_name_raw).decode("latin1", "replace") if p_name_raw else "").lower()
+
+                if not (caps & (1 << 1)):
+                    continue
+
+                if card is not None and c_card == card:
                     return c, p
+
+                if any(k in (c_name + " " + p_name) for k in ["smk", "pro", "m-vave", "jellybean"]):
+                    candidates.insert(0, (c, p))
+                else:
+                    candidates.append((c, p))
+
+        if candidates:
+            return candidates[0]
         raise RuntimeError("No destination MIDI port found via ALSA sequencer")
 
     def send_sysex(self, data: bytes) -> None:
-        ev = ctypes.create_string_buffer(128)
-        self.asound.snd_seq_ev_clear(ev)
-        ev_p = ctypes.cast(ev, ctypes.c_void_p)
-        self.asound.snd_seq_ev_set_source(ev_p, self.port)
-        self.asound.snd_seq_ev_set_subs(ev_p)
-        self.asound.snd_seq_ev_set_direct(ev_p)
         c_data = ctypes.create_string_buffer(data)
-        self.asound.snd_seq_ev_set_sysex(ev_p, len(data), c_data)
-        self.asound.snd_seq_event_output_direct(self.handle, ev_p)
+        data_addr = ctypes.addressof(c_data)
+
+        # Build snd_seq_event_t (28 bytes in ALSA)
+        # Note: snd_seq_ev_clear, snd_seq_ev_set_*, etc. in <alsa/seqmid.h> are C macros / inline
+        # functions not exported in libasound.so. We construct the struct layout directly.
+        is_64bit = ctypes.sizeof(ctypes.c_void_p) == 8
+        ptr_fmt = "Q" if is_64bit else "II"
+        ptr_vals = [data_addr] if is_64bit else [data_addr, 0]
+
+        buf = bytearray(28)
+        struct.pack_into(
+            f"<BBBB8sBBBB I {ptr_fmt}",
+            buf,
+            0,
+            130,  # type: SND_SEQ_EVENT_SYSEX
+            4,    # flags: SND_SEQ_EVENT_LENGTH_VARIABLE
+            0,    # tag
+            253,  # queue: SND_SEQ_QUEUE_DIRECT
+            b"\x00" * 8,  # timestamp
+            0,    # source.client
+            self.port,  # source.port
+            self.dest_client,  # dest.client
+            self.dest_port,    # dest.port
+            len(data),         # data.ext.len
+            *ptr_vals,         # data.ext.ptr
+        )
+
+        c_ev = (ctypes.c_uint8 * 28).from_buffer(buf)
+        res = self.asound.snd_seq_event_output_direct(self.handle, ctypes.byref(c_ev))
+        if res < 0:
+            raise RuntimeError(f"snd_seq_event_output_direct failed: {res}")
+        self.asound.snd_seq_drain_output(self.handle)
 
     def close(self) -> None:
         if self.handle:
